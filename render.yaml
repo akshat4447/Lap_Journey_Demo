@@ -1,0 +1,17 @@
+# Render Blueprint for the FinFlo backend (New → Blueprint → pick this repo).
+services:
+  - type: web
+    name: finflo-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Set these two in the Render dashboard — they're secrets / deploy-specific.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGIN
+        sync: false
