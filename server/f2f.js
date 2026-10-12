@@ -22,15 +22,15 @@ function buildTool(fields) {
             type: "object",
             properties: {
               fieldKey: { type: "string", enum: fields.map(f => f.key) },
-              value: { type: "string", description: "The field value. Currency/number fields: plain digits in rupees or units (e.g. \"4500000\", \"12\"), no symbols or commas. Select fields: exactly one of the listed options." },
-              evidence: { type: "string", description: "The shortest verbatim span copied character-for-character from the transcript that supports the value." },
+              value: { type: "string", description: "The field value, always in English. Currency/number fields: plain digits in rupees or units (e.g. \"4500000\", \"12\"), no symbols or commas. Select fields: exactly one of the listed options. Names and places: transliterated into Latin script." },
+              evidence: { type: "string", description: "The shortest verbatim span copied character-for-character from the transcript (in whatever language/script it was spoken) that supports the value." },
               confidence: { type: "string", enum: ["high", "medium", "low"] },
             },
             required: ["fieldKey", "value", "evidence", "confidence"],
             additionalProperties: false,
           },
         },
-        summary: { type: "string", description: "3-5 sentence neutral summary of the discussion for the credit team." },
+        summary: { type: "string", description: "3-5 sentence neutral summary of the discussion for the credit team, in English." },
       },
       required: ["extractions", "summary"],
       additionalProperties: false,
@@ -50,6 +50,8 @@ function describeFields(fields) {
 
 const SYSTEM_PROMPT = `You extract structured data from the transcript of a face-to-face (personal discussion) meeting between a lender's loan officer and a Loan Against Property (LAP) applicant in India. The transcript comes from automatic speech recognition, so expect missing punctuation, no speaker labels, and occasional misheard words.
 
+The conversation may be in English, in an Indian language (Hindi, Marathi, Tamil, Telugu, Kannada, Malayalam, Bengali, Gujarati), or code-mixed (e.g. Hinglish), and may be written in that language's own script. The form is always filled in English: translate free-text values into English, transliterate names, businesses and places into Latin script, and convert spoken numbers in any language to digits (e.g. "साढ़े चार लाख" = 450000, "ரெண்டு லட்சம்" = 200000). Evidence quotes stay exactly as they appear in the transcript, in the original script.
+
 Your output fills the officer's F2F form, which feeds a credit decision — so accuracy matters more than coverage:
 - Only fill a field when the transcript states it or makes it unambiguous. Leave a field out rather than guess. Officer-judgment fields (conduct, risk flags, recommendation, remarks) should be filled only if the officer says them aloud.
 - The evidence must be copied verbatim from the transcript so it can be highlighted; keep it short (the phrase carrying the value, not the whole turn).
@@ -66,7 +68,7 @@ function getClient(apiKey) {
 }
 
 function normalise(s) {
-  return String(s).toLowerCase().replace(/[\s,.;:!?"'’]+/g, " ").trim();
+  return String(s).toLowerCase().replace(/[\s,.;:!?"'’।॥]+/g, " ").trim();
 }
 
 export function registerF2fRoutes(app, { apiKey }) {
@@ -87,6 +89,7 @@ export function registerF2fRoutes(app, { apiKey }) {
     const context = [
       applicant.name ? `Applicant on file: ${applicant.name}` : null,
       applicant.loanAmount ? `Loan amount on file: ₹${Number(applicant.loanAmount).toLocaleString("en-IN")}` : null,
+      typeof req.body?.discussionLanguage === "string" && req.body.discussionLanguage.length < 40 ? `Language the discussion was recorded in: ${req.body.discussionLanguage}` : null,
     ].filter(Boolean).join("\n");
 
     try {
